@@ -4,7 +4,7 @@ env:
   variables:
     APP_ENV: production
     APP_DEBUG: "false"
-    COMPOSER_HOME: /tmp/composer   # <- make COMPOSER_HOME available to all phases
+    COMPOSER_HOME: /tmp/composer
 
 phases:
   install:
@@ -13,9 +13,10 @@ phases:
       - mkdir -p "$COMPOSER_HOME"
       - chmod 1777 "$COMPOSER_HOME" || true
       - echo "Installing composer if missing"
-      - if ! command -v composer >/dev/null 2>&1; then \
-          curl -sS https://getcomposer.org/installer -o /tmp/composer-setup.php && \
-          php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer; \
+      - |
+        if ! command -v composer >/dev/null 2>&1; then
+          curl -sS https://getcomposer.org/installer -o /tmp/composer-setup.php
+          php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer
         fi
       - echo "Composer version (using forced COMPOSER_HOME=$COMPOSER_HOME)"
       - COMPOSER_HOME=$COMPOSER_HOME composer --version || true
@@ -33,27 +34,4 @@ phases:
     commands:
       - echo "Build frontend (if applicable)"
       - if [ -f package.json ]; then npm ci && npm run build || true; fi
-      - echo "Performing artisan optimization (safe-fail if not applicable)"
-      - php artisan config:cache || true
-      - php artisan route:cache || true
-      - php artisan view:cache || true
-
-  post_build:
-    commands:
-      - echo "Packaging artifact"
-      - mkdir -p build_output
-      - rsync -av --exclude='.git' --exclude='node_modules' --exclude='.env' --exclude='storage/logs/*' ./ build_output/
-      - cd build_output
-      - zip -r ../laravel-deploy.zip .
-      - cd ..
-      - ls -lh laravel-deploy.zip
-
-artifacts:
-  files:
-    - 'laravel-deploy.zip'
-  discard-paths: yes
-
-cache:
-  paths:
-    - '/root/.composer/cache/**'
-    - 'node_modules/**'
+      - echo "Performing artisan optimization (saf
