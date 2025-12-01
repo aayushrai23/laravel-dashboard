@@ -33,5 +33,47 @@ phases:
   build:
     commands:
       - echo "Build frontend (if applicable)"
-      - if [ -f package.json ]; then npm ci && npm run build || true; fi
-      - echo "Performing artisan optimization (saf
+      # Safe npm handling: prefer npm ci when lockfile exists, otherwise fallback to npm install
+      - |
+        if [ -f package.json ]; then
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            echo "Lockfile found — running npm ci"
+            npm ci
+          else
+            echo "No lockfile — running npm install (this will generate a lockfile)"
+            npm install
+          fi
+
+          # Run build if a build script is defined
+          if npm run | grep -q " build"; then
+            npm run build || true
+          else
+            echo "No npm build script defined, skipping npm run build"
+          fi
+        else
+          echo "No package.json — skipping frontend build"
+        fi
+      - echo "Performing artisan optimization (safe-fail if not applicable)"
+      - php artisan config:cache || true
+      - php artisan route:cache || true
+      - php artisan view:cache || true
+
+  post_build:
+    commands:
+      - echo "Packaging artifact"
+      - mkdir -p build_output
+      - rsync -av --exclude='.git' --exclude='node_modules' --exclude='.env' --exclude='storage/logs/*' ./ build_output/
+      - cd build_output
+      - zip -r ../laravel-deploy.zip .
+      - cd ..
+      - ls -lh laravel-deploy.zip || true
+
+artifacts:
+  files:
+    - 'laravel-deploy.zip'
+  discard-paths: yes
+
+cache:
+  paths:
+    - '/root/.composer/cache/**'
+    - 'node_modules/**'
