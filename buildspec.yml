@@ -1,0 +1,54 @@
+version: 0.2
+
+env:
+  variables:
+    APP_ENV: production
+    APP_DEBUG: "false"
+
+phases:
+  install:
+    runtime-versions:
+      php: 8.3
+      nodejs: 18
+    commands:
+      - echo "Installing composer if missing"
+      - if ! command -v composer >/dev/null 2>&1; then curl -sS https://getcomposer.org/installer -o /tmp/composer-setup.php && php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer; fi
+      - composer --version || true
+      - node -v || true
+      - npm -v || true
+
+  pre_build:
+    commands:
+      - echo "Preparing .env (do NOT store secrets in repo) - inject in deploy targets"
+      - cp .env.example .env || true
+      - echo "Installing PHP dependencies (production)"
+      - composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
+
+  build:
+    commands:
+      - echo "Build frontend (if applicable)"
+      - if [ -f package.json ]; then npm ci && npm run build || true; fi
+      - echo "Performing artisan optimization"
+      - php artisan config:cache || true
+      - php artisan route:cache || true
+      - php artisan view:cache || true
+
+  post_build:
+    commands:
+      - echo "Packaging artifact"
+      - mkdir -p build_output
+      - rsync -av --exclude='.git' --exclude='node_modules' --exclude='.env' --exclude='storage/logs/*' ./ build_output/
+      - cd build_output
+      - zip -r ../laravel-deploy.zip .
+      - cd ..
+      - ls -lh laravel-deploy.zip
+
+artifacts:
+  files:
+    - 'laravel-deploy.zip'
+  discard-paths: yes
+
+cache:
+  paths:
+    - '/root/.composer/cache/**'
+    - 'node_modules/**'
