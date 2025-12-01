@@ -1,0 +1,19 @@
+version: 0.0
+os: linux
+files:
+  - source: laravel-deploy.zip
+    destination: /tmp/code_deploy_artifact
+
+hooks:
+  BeforeInstall:
+    - location: scripts/before_install.sh
+      timeout: 300
+      runas: root
+  AfterInstall:
+    - location: scripts/after_install.sh
+      timeout: 1200
+      runas: root
+  ApplicationStart:
+    - location: scripts/start_server.sh
+      timeout: 300
+      runas: root
