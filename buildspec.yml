@@ -7,28 +7,31 @@ env:
 
 phases:
   install:
-    runtime-versions:
-      php: 8.3
-      nodejs: 18
     commands:
+      - echo "Prepare COMPOSER_HOME at /tmp/composer and ensure writable"
+      - export COMPOSER_HOME=/tmp/composer
+      - mkdir -p "$COMPOSER_HOME"
+      - chmod 1777 "$COMPOSER_HOME" || true
       - echo "Installing composer if missing"
       - if ! command -v composer >/dev/null 2>&1; then curl -sS https://getcomposer.org/installer -o /tmp/composer-setup.php && php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer; fi
-      - composer --version || true
+      - echo "Composer version (using forced COMPOSER_HOME=$COMPOSER_HOME)"
+      - COMPOSER_HOME=$COMPOSER_HOME composer --version || true
       - node -v || true
       - npm -v || true
 
   pre_build:
     commands:
+      - export COMPOSER_HOME=/tmp/composer
       - echo "Preparing .env (do NOT store secrets in repo) - inject in deploy targets"
       - cp .env.example .env || true
-      - echo "Installing PHP dependencies (production)"
-      - composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
+      - echo "Installing PHP dependencies (production) with forced COMPOSER_HOME"
+      - COMPOSER_HOME=$COMPOSER_HOME composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction --no-ansi
 
   build:
     commands:
       - echo "Build frontend (if applicable)"
       - if [ -f package.json ]; then npm ci && npm run build || true; fi
-      - echo "Performing artisan optimization"
+      - echo "Performing artisan optimization (safe-fail if not applicable)"
       - php artisan config:cache || true
       - php artisan route:cache || true
       - php artisan view:cache || true
